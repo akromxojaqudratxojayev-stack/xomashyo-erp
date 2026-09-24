@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Sparkles,
   ExternalLink,
+  Edit3,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import { divIcon } from 'leaflet';
