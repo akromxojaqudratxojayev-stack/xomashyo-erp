@@ -364,8 +364,8 @@ app.get('/api/trip/today', async (req, res) => {
     }
 
     // Gaz narxi va km normasi
-    const refillPrice = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price')?.value || 85000);
-    const refillKm = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km')?.value || 220);
+    const refillPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+    const refillKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
     const costPerKm = refillPrice / refillKm;
 
     res.json({
@@ -406,8 +406,8 @@ app.post('/api/trip/update-location', async (req, res) => {
 
     const newTotalKm = Math.round((trip.total_km + addedKm) * 10) / 10;
 
-    const refillPrice = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price')?.value || 85000);
-    const refillKm = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km')?.value || 220);
+    const refillPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+    const refillKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
     const costPerKm = refillPrice / refillKm;
     const gasSpent = Math.round(newTotalKm * costPerKm);
 
@@ -445,8 +445,8 @@ app.post('/api/trip/manual-km', async (req, res) => {
     const km = Number(total_km) || 0;
     const today = getTodayDate();
 
-    const refillPrice = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price')?.value || 85000);
-    const refillKm = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km')?.value || 220);
+    const refillPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+    const refillKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
     const costPerKm = refillPrice / refillKm;
     const gasSpent = Math.round(km * costPerKm);
 
@@ -851,8 +851,8 @@ app.get('/api/trip/today', async (req, res) => {
     }
 
     // Gaz narxi va km normasi
-    const refillPrice = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price')?.value || 85000);
-    const refillKm = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km')?.value || 220);
+    const refillPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+    const refillKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
     const costPerKm = refillPrice / refillKm;
 
     res.json({
@@ -893,8 +893,8 @@ app.post('/api/trip/update-location', async (req, res) => {
 
     const newTotalKm = Math.round((trip.total_km + addedKm) * 10) / 10;
 
-    const refillPrice = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price')?.value || 85000);
-    const refillKm = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km')?.value || 220);
+    const refillPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+    const refillKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
     const costPerKm = refillPrice / refillKm;
     const gasSpent = Math.round(newTotalKm * costPerKm);
 
@@ -932,8 +932,8 @@ app.post('/api/trip/manual-km', async (req, res) => {
     const km = Number(total_km) || 0;
     const today = getTodayDate();
 
-    const refillPrice = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price')?.value || 85000);
-    const refillKm = Number(await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km')?.value || 220);
+    const refillPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+    const refillKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
     const costPerKm = refillPrice / refillKm;
     const gasSpent = Math.round(km * costPerKm);
 
@@ -1127,8 +1127,8 @@ app.get('/api/stats', async (req, res) => {
     const kartonStockKg = Math.max(0, buyStatsAll.total_karton_bought_kg - saleKartonAll.total_sold_kg);
     const salafanStockKg = Math.max(0, buyStatsAll.total_salafan_bought_kg - saleSalafanAll.total_sold_kg);
 
-    const gasExpense = await db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE category = 'GAZ' AND (is_active = 1 OR is_active IS NULL) ${minDateQuery}`).get(...params).total;
-    const otherExpense = await db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE category != 'GAZ' AND (is_active = 1 OR is_active IS NULL) ${minDateQuery}`).get(...params).total;
+    const gasExpense = (await db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE category = 'GAZ' AND (is_active = 1 OR is_active IS NULL) ${minDateQuery}`).get(...params)).total;
+    const otherExpense = (await db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE category != 'GAZ' AND (is_active = 1 OR is_active IS NULL) ${minDateQuery}`).get(...params)).total;
     const totalExpenses = gasExpense + otherExpense;
 
     const netProfit = totalSoldSum - buyStats.total_bought_sum - totalExpenses;
