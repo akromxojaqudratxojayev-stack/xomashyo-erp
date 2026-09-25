@@ -221,69 +221,74 @@ export default function DastafkaView({ currentUser }) {
     }
   };
 
-  const sortFromSpecificStore = async (store) => {
-    setIsSorting(true);
+  const handleOpenRoute = (store = null, type = 'yandex') => {
     const uncompleted = deliveries.filter(d => d.status === 'KUTILMOQDA');
     const completed = deliveries.filter(d => d.status !== 'KUTILMOQDA');
     
-    let sortedUncompleted = [store];
-    let currentPoint = { lat: store.store_lat, lng: store.store_lng };
-    let remain = uncompleted.filter(d => d.id !== store.id);
+    if (uncompleted.length === 0) return alert('Barcha manzillar yakunlangan!');
 
-    const getDist = (lat1, lon1, lat2, lon2) => {
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    };
+    let sortedUncompleted = [];
+    
+    if (store) {
+      // Shu do'kondan boshlash
+      sortedUncompleted = [store];
+      let currentPoint = { lat: store.store_lat, lng: store.store_lng };
+      let remain = uncompleted.filter(d => d.id !== store.id);
 
-    while (remain.length > 0) {
-      let nearestIdx = 0;
-      let minDist = Infinity;
-      for (let i = 0; i < remain.length; i++) {
-        const dist = getDist(currentPoint.lat, currentPoint.lng, remain[i].store_lat, remain[i].store_lng);
-        if (dist < minDist) {
-          minDist = dist;
-          nearestIdx = i;
+      const getDist = (lat1, lon1, lat2, lon2) => {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      };
+
+      while (remain.length > 0) {
+        let nearestIdx = 0;
+        let minDist = Infinity;
+        for (let i = 0; i < remain.length; i++) {
+          const dist = getDist(currentPoint.lat, currentPoint.lng, remain[i].store_lat, remain[i].store_lng);
+          if (dist < minDist) { minDist = dist; nearestIdx = i; }
         }
+        const nearestStore = remain[nearestIdx];
+        sortedUncompleted.push(nearestStore);
+        currentPoint = { lat: nearestStore.store_lat, lng: nearestStore.store_lng };
+        remain.splice(nearestIdx, 1);
       }
-      const nearestStore = remain[nearestIdx];
-      sortedUncompleted.push(nearestStore);
-      currentPoint = { lat: nearestStore.store_lat, lng: nearestStore.store_lng };
-      remain.splice(nearestIdx, 1);
-    }
-
-    const newOrder = [...sortedUncompleted, ...completed];
-    setDeliveries(newOrder);
-
-    try {
-      await fetch('/api/deliveries/reorder', {
+      
+      const newOrder = [...sortedUncompleted, ...completed];
+      setDeliveries(newOrder);
+      
+      // Serverda saqlash (orqafonda)
+      fetch('/api/deliveries/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ordered_ids: newOrder.map(d => d.id) })
-      });
-    } catch (error) {
-      console.error(error);
+      }).catch(console.error);
+    } else {
+      // Umumiy yo'nalish
+      sortedUncompleted = uncompleted;
     }
-    
-    setIsSorting(false);
-  };
 
-  const openYandexRoute = () => {
-    const uncompleted = deliveries.filter(d => d.status === 'KUTILMOQDA' && d.store_lat);
-    if (uncompleted.length === 0) return alert('Barcha manzillar yakunlangan yoki GPS koordinatalar yo\'q!');
-    
+    // URL yasash
+    const validPoints = sortedUncompleted.filter(d => d.store_lat);
+    if (validPoints.length === 0) return alert('GPS koordinatalar yo\'q!');
+
     const points = [];
-    if (currentCoords?.lat) {
+    if (!store && currentCoords?.lat) {
       points.push(`${currentCoords.lat},${currentCoords.lng}`);
     }
-    uncompleted.forEach(d => {
+    validPoints.forEach(d => {
       points.push(`${d.store_lat},${d.store_lng}`);
     });
-    
-    const url = `https://yandex.com/maps/?rtext=${points.join('~')}&rtt=auto`;
-    window.open(url, '_blank');
+
+    if (type === 'yandex') {
+      const url = `https://yandex.com/maps/?rtext=${points.join('~')}&rtt=auto`;
+      window.open(url, '_blank');
+    } else {
+      const url = `https://www.google.com/maps/dir/${points.join('/')}`;
+      window.open(url, '_blank');
+    }
   };
 
   // Do'konda ishni yakunlash ("BAJARILDI")
@@ -482,7 +487,7 @@ export default function DastafkaView({ currentUser }) {
 
         {deliveries.filter(d => d.status === 'KUTILMOQDA').length > 0 && (
           <button
-            onClick={openYandexRoute}
+            onClick={() => handleOpenRoute(null, 'yandex')}
             className="flex items-center justify-center space-x-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition whitespace-nowrap"
             title="Barcha manzillarni bitta ketma-ket marshrut qilib ochish"
           >
@@ -623,27 +628,23 @@ export default function DastafkaView({ currentUser }) {
                       </a>
                     )}
 
-                    <a
-                      href={`https://yandex.com/maps/?rtext=~${item.store_lat},${item.store_lng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => handleOpenRoute(item, 'yandex')}
                       className="flex items-center space-x-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-semibold transition"
-                      title="Yandex Navigatorda ochish"
+                      title="Yandex Navigatorda zanjirli marshrut ochish"
                     >
                       <Navigation className="w-3.5 h-3.5" />
                       <span>Yandex</span>
-                    </a>
+                    </button>
 
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${item.store_lat},${item.store_lng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => handleOpenRoute(item, 'google')}
                       className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold transition"
-                      title="Google Maps da ochish"
+                      title="Google Maps da zanjirli marshrut ochish"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Google</span>
-                    </a>
+                    </button>
                   </div>
 
                 </div>
@@ -651,14 +652,6 @@ export default function DastafkaView({ currentUser }) {
                 {/* AMAL TUGMALARI (faqat Kutilmoqda bo'lsa) */}
                 {item.status === 'KUTILMOQDA' && (
                   <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2 justify-end">
-                    <button
-                      onClick={() => sortFromSpecificStore(item)}
-                      className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-semibold transition flex items-center space-x-1"
-                      title="Marshrutni shu do'kondan boshlab qayta hisoblash"
-                    >
-                      <MapPin className="w-4 h-4" />
-                      <span>Shu yerdan boshlash</span>
-                    </button>
                     <button
                       onClick={() => {
                         setPostponeModalItem(item);
