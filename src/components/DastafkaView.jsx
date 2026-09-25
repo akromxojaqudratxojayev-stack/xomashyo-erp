@@ -246,6 +246,50 @@ export default function DastafkaView({ currentUser }) {
     }
   };
 
+
+  const handleReorderFrom = (store) => {
+    if (!store) return;
+    const uncompleted = deliveries.filter(d => d.status === 'KUTILMOQDA');
+    const completed = deliveries.filter(d => d.status !== 'KUTILMOQDA');
+    
+    let sortedUncompleted = [store];
+    let currentPoint = { lat: store.store_lat, lng: store.store_lng };
+    let remain = uncompleted.filter(d => d.id !== store.id);
+
+    const getDist = (lat1, lon1, lat2, lon2) => {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    };
+
+    while (remain.length > 0) {
+      let nearestIdx = 0;
+      let minDist = Infinity;
+      for (let i = 0; i < remain.length; i++) {
+        const dist = getDist(currentPoint.lat, currentPoint.lng, remain[i].store_lat, remain[i].store_lng);
+        if (dist < minDist) { minDist = dist; nearestIdx = i; }
+      }
+      const nearestStore = remain[nearestIdx];
+      sortedUncompleted.push(nearestStore);
+      currentPoint = { lat: nearestStore.store_lat, lng: nearestStore.store_lng };
+      remain.splice(nearestIdx, 1);
+    }
+    
+    const newOrder = [...sortedUncompleted, ...completed];
+    setDeliveries(newOrder);
+    
+    // Serverda saqlash
+    fetch('/api/deliveries/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ordered_ids: newOrder.map(d => d.id) })
+    }).catch(console.error);
+    
+    
+  };
+
   const handleOpenRoute = (store = null, type = 'yandex') => {
     const uncompleted = deliveries.filter(d => d.status === 'KUTILMOQDA');
     const completed = deliveries.filter(d => d.status !== 'KUTILMOQDA');
@@ -557,7 +601,7 @@ export default function DastafkaView({ currentUser }) {
             )}
             {deliveries.filter(d => d.status === 'KUTILMOQDA' && d.store_lat).map((d, i) => (
               <Marker key={`marker-${d.id}`} position={[d.store_lat, d.store_lng]} icon={createNumberedIcon(i + 1)}>
-                <Popup><b>{i+1}. {d.store_name}</b><br/>{d.store_address}</Popup>
+                <Popup><b>{i+1}. {d.store_name}</b><br/>{d.store_address}<div className="mt-2"><button onClick={() => handleReorderFrom(d)} className="px-3 py-1.5 w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold text-xs shadow-sm transition">📍 Shu yerdan boshlash</button></div></Popup>
               </Marker>
             ))}
             <Polyline 
