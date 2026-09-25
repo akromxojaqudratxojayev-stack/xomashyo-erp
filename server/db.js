@@ -96,6 +96,13 @@ export async function initDatabase() {
       )
     `).run();
 
+    // Do'konni arxivga olish (soft delete) uchun ustun qo'shish
+    try {
+      await db.prepare(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1`).run();
+    } catch (e) {
+      console.log('Ustun allaqachon mavjud yoki xatolik (is_active)', e.message);
+    }
+
     // Dastafkalar jadvali (bugungi yo'nalishlar)
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS deliveries (
@@ -161,6 +168,67 @@ export async function initDatabase() {
         description TEXT
       )
     `).run();
+
+    // Yangi qo'shilgan jadvallar va ustunlar (Modul: Ta'sischilar, Kategoriyalar, Sverka)
+    try {
+      await db.prepare('ALTER TABLE stores ADD COLUMN IF NOT EXISTS network_name TEXT').run();
+      await db.prepare('ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1').run();
+      await db.prepare('ALTER TABLE expenses ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1').run();
+      await db.prepare('ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1').run();
+    } catch(e) { console.log('ALTER xatoligi (ehtimol ustunlar bor):', e.message); }
+
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS founders (
+        id SERIAL PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL,
+        balance REAL DEFAULT 0
+      )
+    `).run();
+
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS founder_transactions (
+        id SERIAL PRIMARY KEY,
+        founder_id INTEGER REFERENCES founders(id),
+        date TEXT NOT NULL,
+        amount REAL NOT NULL,
+        type TEXT NOT NULL,
+        notes TEXT,
+        is_active INTEGER DEFAULT 1
+      )
+    `).run();
+
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS expense_categories (
+        id SERIAL PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL
+      )
+    `).run();
+
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS month_closures (
+        id SERIAL PRIMARY KEY,
+        closure_date TEXT NOT NULL,
+        closed_by TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+
+    // Dastlabki uchriditellar va kategoriyalar
+    const defaultCategories = ["Yoqilg'i", "Tushlik", "Zavod xarajati", "Soliq", "Arenda"];
+    for(const cat of defaultCategories) {
+      try {
+        const exists = await db.prepare('SELECT id FROM expense_categories WHERE name = ?').get(cat);
+        if(!exists) await db.prepare('INSERT INTO expense_categories (name) VALUES (?)').run(cat);
+      } catch(e) {}
+    }
+
+    const defaultFounders = ["Akrom", "Saidaziz", "A'lo"];
+    for(const f of defaultFounders) {
+      try {
+        const exists = await db.prepare('SELECT id FROM founders WHERE name = ?').get(f);
+        if(!exists) await db.prepare('INSERT INTO founders (name) VALUES (?)').run(f);
+      } catch(e) {}
+    }
 
     // Dastlabki admin profilini yaratish
     const adminExists = await db.prepare("SELECT id FROM users WHERE username = 'admin'").get();

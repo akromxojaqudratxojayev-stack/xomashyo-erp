@@ -1,17 +1,7 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
-  Wallet, 
-  TrendingUp, 
-  ShoppingBag, 
-  Fuel, 
-  DollarSign, 
-  Settings, 
-  ShieldAlert, 
-  Check, 
-  Plus, 
-  Trash2, 
-  Key, 
-  AlertTriangle 
+  Wallet, TrendingUp, ShoppingBag, Fuel, DollarSign, Settings, 
+  ShieldAlert, Check, Plus, Trash2, Key, AlertTriangle, Edit2, Users, List
 } from 'lucide-react';
 
 export default function FinancialView({ currentUser }) {
@@ -19,22 +9,35 @@ export default function FinancialView({ currentUser }) {
   const [settings, setSettings] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [users, setUsers] = useState([]);
+  const [expenseCategories, setExpenseCategories] = useState([]);
+  const [founders, setFounders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Narxlar formasi
+  const [activeTab, setActiveTab] = useState('FINANCE');
+
   const [kartonPrice, setKartonPrice] = useState('');
   const [salafanPrice, setSalafanPrice] = useState('');
   const [gasRefillPrice, setGasRefillPrice] = useState('');
   const [gasRefillKm, setGasRefillKm] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Yangi xarajat qo'shish
   const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [expenseCategory, setExpenseCategory] = useState('BOSHQA');
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [expenseCategory, setExpenseCategory] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseDesc, setExpenseDesc] = useState('');
+  const [expenseDate, setExpenseDate] = useState('');
 
-  // Parolni o'zgartirish
+  const [showCatModal, setShowCatModal] = useState(false);
+  const [editingCat, setEditingCat] = useState(null);
+  const [catName, setCatName] = useState('');
+
+  const [showFounderModal, setShowFounderModal] = useState(false);
+  const [selectedFounderId, setSelectedFounderId] = useState('');
+  const [founderAmount, setFounderAmount] = useState('');
+  const [founderNotes, setFounderNotes] = useState('');
+  const [founderDate, setFounderDate] = useState('');
+
   const [selectedUserId, setSelectedUserId] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
@@ -42,22 +45,28 @@ export default function FinancialView({ currentUser }) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [resSt, resSet, resExp, resU] = await Promise.all([
+      const [resSt, resSet, resExp, resU, resCat, resFounders] = await Promise.all([
         fetch('/api/stats'),
         fetch('/api/settings'),
         fetch('/api/expenses'),
-        fetch('/api/users')
+        fetch('/api/users'),
+        fetch('/api/expense-categories'),
+        fetch('/api/founders')
       ]);
 
       const st = await resSt.json();
       const set = await resSet.json();
       const exp = await resExp.json();
       const u = await resU.json();
+      const cat = await resCat.json();
+      const fnd = await resFounders.json();
 
       setStats(st);
       setSettings(set);
       setExpenses(Array.isArray(exp) ? exp : []);
       setUsers(Array.isArray(u) ? u : []);
+      setExpenseCategories(Array.isArray(cat) ? cat : []);
+      setFounders(Array.isArray(fnd) ? fnd : []);
 
       if (set) {
         setKartonPrice(set.karton_buy_price || '1500');
@@ -80,7 +89,6 @@ export default function FinancialView({ currentUser }) {
     loadData();
   }, []);
 
-  // Narx va sozlamalarni saqlash
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     try {
@@ -96,7 +104,7 @@ export default function FinancialView({ currentUser }) {
       });
       if (res.ok) {
         setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 4000);
+        setTimeout(() => setSaveSuccess(false), 3000);
         loadData();
       }
     } catch (err) {
@@ -104,48 +112,23 @@ export default function FinancialView({ currentUser }) {
     }
   };
 
-  // Yangi xarajat qo'shish
-  const handleAddExpense = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: expenseCategory,
-          amount: expenseAmount,
-          description: expenseDesc
-        })
-      });
-      if (res.ok) {
-        setShowExpenseModal(false);
-        setExpenseAmount('');
-        setExpenseDesc('');
-        loadData();
-      }
-    } catch (err) {
-      alert('Xatolik: ' + err.message);
-    }
-  };
-
-  // Parolni o'zgartirish
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    setPasswordMsg('');
+    if (newPassword.length < 4) {
+      alert("Parol kamida 4 ta belgi bo'lishi kerak");
+      return;
+    }
     try {
-      const res = await fetch('/api/change-password', {
-        method: 'POST',
+      const res = await fetch(`/api/users/${selectedUserId}/password`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: selectedUserId,
-          newPassword
-        })
+        body: JSON.stringify({ new_password: newPassword })
       });
       const data = await res.json();
       if (res.ok) {
-        setPasswordMsg('Parol muvaffaqiyatli o\'zgartirildi!');
+        setPasswordMsg("Parol muvaffaqiyatli o'zgartirildi");
         setNewPassword('');
-        setTimeout(() => setPasswordMsg(''), 4000);
+        setTimeout(() => setPasswordMsg(''), 3000);
       } else {
         alert(data.error || 'Xatolik');
       }
@@ -154,403 +137,414 @@ export default function FinancialView({ currentUser }) {
     }
   };
 
+  const handleAddExpense = async (e) => {
+    e.preventDefault();
+    try {
+      const method = editingExpense ? 'PUT' : 'POST';
+      const url = editingExpense ? `/api/expenses/${editingExpense.id}` : '/api/expenses';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: expenseCategory,
+          amount: expenseAmount,
+          description: expenseDesc,
+          date: expenseDate
+        })
+      });
+      if (res.ok) {
+        setShowExpenseModal(false);
+        loadData();
+      }
+    } catch (err) {
+      alert('Xatolik: ' + err.message);
+    }
+  };
+
+  const handleEditExpense = (exp) => {
+    setEditingExpense(exp);
+    setExpenseCategory(exp.category);
+    setExpenseAmount(exp.amount.toString());
+    setExpenseDesc(exp.description || '');
+    setExpenseDate(exp.date);
+    setShowExpenseModal(true);
+  };
+
+  const handleDeleteExpense = async (id) => {
+    if (!window.confirm("Rostdan ham ushbu xarajatni o'chirmoqchimisiz?")) return;
+    try {
+      await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+      loadData();
+    } catch (err) {
+      alert("O'chirishda xatolik: " + err.message);
+    }
+  };
+
+  const openExpenseModal = () => {
+    setEditingExpense(null);
+    setExpenseCategory(expenseCategories[0]?.name || 'BOSHQA');
+    setExpenseAmount('');
+    setExpenseDesc('');
+    setExpenseDate(new Date().toISOString().split('T')[0]);
+    setShowExpenseModal(true);
+  };
+
+  const handleSaveCat = async (e) => {
+    e.preventDefault();
+    try {
+      const method = editingCat ? 'PUT' : 'POST';
+      const url = editingCat ? `/api/expense-categories/${editingCat.id}` : '/api/expense-categories';
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: catName })
+      });
+      setShowCatModal(false);
+      loadData();
+    } catch (err) {
+      alert('Xatolik: ' + err.message);
+    }
+  };
+
+  const handleEditCat = (cat) => {
+    setEditingCat(cat);
+    setCatName(cat.name);
+    setShowCatModal(true);
+  };
+
+  const handleDeleteCat = async (id) => {
+    if (!window.confirm("Rostdan ham ushbu toifani o'chirmoqchimisiz?")) return;
+    await fetch(`/api/expense-categories/${id}`, { method: 'DELETE' });
+    loadData();
+  };
+
+  const handleAddDividend = async (e) => {
+    e.preventDefault();
+    try {
+      await fetch('/api/founder-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          founder_id: selectedFounderId,
+          amount: founderAmount,
+          notes: founderNotes,
+          date: founderDate
+        })
+      });
+      setShowFounderModal(false);
+      loadData();
+    } catch (err) {
+      alert('Xatolik: ' + err.message);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-10 font-bold text-slate-500">Yuklanmoqda...</div>;
+  }
+
   const isProfitPositive = (stats?.financial?.net_profit || 0) >= 0;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
       
-      {/* 1. MOLIYAVIY ASOSIY KO'RSATKICHLAR */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Sotuv (Kirim) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Jami Sotuv (Kirim)</span>
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900 mt-2">
-            {stats?.financial?.total_sales_income?.toLocaleString() || 0} <span className="text-xs font-normal">so'm</span>
-          </div>
-        </div>
-
-        {/* Xarid (Chiqim) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Do'konlarga To'langan</span>
-            <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
-              <ShoppingBag className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900 mt-2">
-            {stats?.financial?.total_purchases_cost?.toLocaleString() || 0} <span className="text-xs font-normal">so'm</span>
-          </div>
-        </div>
-
-        {/* Gaz va Yoqilg'i */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gaz va Yoqilg'i</span>
-            <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
-              <Fuel className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900 mt-2">
-            {stats?.financial?.gas_expenses?.toLocaleString() || 0} <span className="text-xs font-normal">so'm</span>
-          </div>
-          <span className="text-[10px] text-slate-400 mt-1 block">GPS masofasi asosida</span>
-        </div>
-
-        {/* Sof Foyda */}
-        <div className={`p-5 rounded-2xl shadow-sm text-white flex flex-col justify-between ${
-          isProfitPositive 
-            ? 'bg-gradient-to-br from-emerald-600 to-teal-700' 
-            : 'bg-gradient-to-br from-rose-600 to-red-700'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-white/90">Sof Foyda</span>
-            <div className="p-2 bg-white/20 rounded-xl">
-              <Wallet className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div className="text-2xl font-black mt-2">
-            {stats?.financial?.net_profit?.toLocaleString() || 0} <span className="text-xs font-normal">so'm</span>
-          </div>
-          <span className="text-[10px] text-white/80 mt-1 block">
-            = Sotuv - Xarid - Gaz - Chiqimlar
-          </span>
-        </div>
-
+      {/* TABS */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {[
+          { id: 'FINANCE', label: 'Asosiy Hisobotlar', icon: Wallet },
+          { id: 'EXPENSES', label: 'Xarajatlar', icon: DollarSign },
+          { id: 'CATEGORIES', label: 'Xarajat Toifalari', icon: List },
+          { id: 'FOUNDERS', label: "Ta'sischilar", icon: Users }
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-colors ${activeTab === t.id ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+          >
+            <t.icon className="w-4 h-4" />
+            <span>{t.label}</span>
+          </button>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* 2. NARXLAR VA GAZ SOZLAMALARI */}
-        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-              <Settings className="w-5 h-5 text-emerald-600" />
-              <span>Joriy Narxlar & Gaz Normasi</span>
-            </h3>
-            {saveSuccess && (
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg flex items-center space-x-1">
-                <Check className="w-3.5 h-3.5" />
-                <span>Saqlandi!</span>
-              </span>
-            )}
-          </div>
-
-          {/* O'ZGARMAS NARX KAFOLATI XABARI */}
-          <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl flex items-start space-x-2.5 text-xs text-amber-900">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold">O'zgarmas narx kafolati:</span> Bu yerda narx o'zgartirilsa, faqat <b>kelgusi yangi operatsiyalar</b> uchun qo'llaniladi. Avval olingan va sotilgan mahsulotlarning arxiv narxlari aslo buzilmaydi!
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveSettings} className="space-y-4">
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  📦 Karton olish narxi (so'm/kg):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={kartonPrice}
-                  onChange={(e) => setKartonPrice(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500"
-                />
+      {activeTab === 'FINANCE' && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Jami Sotuv (Kirim)</span>
+                <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl"><TrendingUp className="w-4 h-4" /></div>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  🛍️ Salafan olish narxi (so'm/kg):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={salafanPrice}
-                  onChange={(e) => setSalafanPrice(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500"
-                />
+              <div className="text-2xl font-black text-slate-900 mt-2">
+                {stats?.financial?.total_sales_income?.toLocaleString() || 0} <span className="text-xs font-normal">so'm</span>
               </div>
             </div>
 
-            <div className="border-t border-slate-100 pt-3">
-              <span className="text-xs font-bold text-slate-800 block mb-2">
-                ⛽ Gaz Zapravka Ko'rsatkichlari:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Do'konlarga To'langan</span>
+                <div className="p-2 bg-amber-100 text-amber-700 rounded-xl"><ShoppingBag className="w-4 h-4" /></div>
+              </div>
+              <div className="text-2xl font-black text-slate-900 mt-2">
+                {stats?.financial?.total_purchases_cost?.toLocaleString() || 0} <span className="text-xs font-normal">so'm</span>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Boshqa Chiqimlar</span>
+                <div className="p-2 bg-rose-100 text-rose-700 rounded-xl"><Fuel className="w-4 h-4" /></div>
+              </div>
+              <div className="text-2xl font-black text-slate-900 mt-2">
+                {stats?.financial?.total_expenses?.toLocaleString() || 0} <span className="text-xs font-normal">so'm</span>
+              </div>
+            </div>
+
+            <div className={`p-5 rounded-2xl border shadow-sm ${isProfitPositive ? 'bg-indigo-600 border-indigo-700' : 'bg-rose-600 border-rose-700'}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-100 uppercase tracking-wider">Sof Foyda</span>
+                <div className="p-2 bg-white/20 text-white rounded-xl"><Wallet className="w-4 h-4" /></div>
+              </div>
+              <div className="text-2xl font-black text-white mt-2">
+                {stats?.financial?.net_profit?.toLocaleString() || 0} <span className="text-xs font-medium text-indigo-100">so'm</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+              <h3 className="text-base font-bold text-slate-800 flex items-center space-x-2 border-b border-slate-100 pb-3">
+                <Settings className="w-5 h-5 text-indigo-600" />
+                <span>Asosiy Narxlar va Sozlamalar</span>
+              </h3>
+              <form onSubmit={handleSaveSettings} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Karton olish narxi (so'm)</label>
+                    <input type="number" value={kartonPrice} onChange={(e) => setKartonPrice(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Salafan olish narxi (so'm)</label>
+                    <input type="number" value={salafanPrice} onChange={(e) => setSalafanPrice(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" />
+                  </div>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Fuel className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-bold text-slate-800">Gaz Kalkulyatori</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Zapravka (so'm)</label>
+                      <input type="number" value={gasRefillPrice} onChange={(e) => setGasRefillPrice(e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Necha km?</label>
+                      <input type="number" value={gasRefillKm} onChange={(e) => setGasRefillKm(e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold" />
+                    </div>
+                  </div>
+                </div>
+                <div className="pt-2">
+                  <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center space-x-2">
+                    {saveSuccess ? <><Check className="w-4 h-4" /><span>Saqlandi!</span></> : <span>Sozlamalarni Saqlash</span>}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-base font-bold text-slate-800 flex items-center space-x-2 border-b border-slate-100 pb-3 mb-4">
+                <ShieldAlert className="w-5 h-5 text-rose-600" />
+                <span>Parollar</span>
+              </h3>
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                {passwordMsg && <div className="p-3 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl">{passwordMsg}</div>}
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                    1 ta to'liq zapravka narxi (so'm):
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={gasRefillPrice}
-                    onChange={(e) => setGasRefillPrice(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 text-sm"
-                  />
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Xodim:</label>
+                  <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium">
+                    {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                  </select>
                 </div>
-
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                    1 ta zapravkada yuradigan km:
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={gasRefillKm}
-                    onChange={(e) => setGasRefillKm(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 text-sm"
-                  />
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Yangi parol:</label>
+                  <input type="text" minLength="4" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Kamida 4 ta belgi" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
                 </div>
-              </div>
-              <div className="mt-2 text-right">
-                <span className="text-[11px] text-slate-500">
-                  1 km yo'l tannarxi: <b className="text-emerald-700">{Math.round(Number(gasRefillPrice || 0) / Number(gasRefillKm || 1))} so'm/km</b>
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
-            >
-              Narxlar va Gaz Sozlamalarini Saqlash
-            </button>
-          </form>
-        </div>
-
-        {/* 3. PAROLLARNI BOSHQARISH VA XAVFSIZLIK */}
-        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-              <Key className="w-5 h-5 text-emerald-600" />
-              <span>Xodimlar Parollarini Boshqarish</span>
-            </h3>
-          </div>
-
-          <p className="text-xs text-slate-500">
-            Hisobchi yoki Admin xodimlarning kirish parollarini shu yerdan xavfsiz yangilay oladi.
-          </p>
-
-          {passwordMsg && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center space-x-2 font-medium">
-              <Check className="w-4 h-4" />
-              <span>{passwordMsg}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleChangePassword} className="space-y-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Xodimni tanlang:
-              </label>
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
-              >
-                {users.map(u => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} ({u.username} - {u.role})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Yangi Parol:
-              </label>
-              <input
-                type="text"
-                required
-                minLength="4"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Kamida 4 ta belgi"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow transition"
-            >
-              Parolni Yangilash
-            </button>
-          </form>
-
-          {/* Foydalanuvchilar qisqa ro'yxati */}
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <span className="text-[11px] font-bold text-slate-500 uppercase block mb-2">
-              Tizimdagi Rollar:
-            </span>
-            <div className="space-y-1.5">
-              {users.map(u => (
-                <div key={u.id} className="flex items-center justify-between text-xs py-1 px-2.5 bg-slate-50 rounded-lg">
-                  <span className="font-semibold text-slate-800">{u.name}</span>
-                  <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">
-                    {u.role}
-                  </span>
-                </div>
-              ))}
+                <button type="submit" className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow transition">Parolni Yangilash</button>
+              </form>
             </div>
           </div>
+        </>
+      )}
 
-        </div>
-
-      </div>
-
-      {/* 4. XARAJATLAR RO'YXATI */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <div>
+      {activeTab === 'EXPENSES' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-800 flex items-center space-x-2">
               <DollarSign className="w-5 h-5 text-emerald-600" />
               <span>Chiqimlar va Xarajatlar Tarixi</span>
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              GPS orqali hisoblangan Gaz sarfi va boshqa kunlik xarajatlar
-            </p>
+            <button onClick={openExpenseModal} className="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
+              <Plus className="w-3.5 h-3.5" />
+              <span>Xarajat Qo'shish</span>
+            </button>
           </div>
 
-          <button
-            onClick={() => setShowExpenseModal(true)}
-            className="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Xarajat Qo'shish</span>
-          </button>
-        </div>
-
-        {expenses.length === 0 ? (
-          <div className="text-center py-10 text-slate-400 text-xs">
-            Hozircha xarajatlar kiritilmagan
-          </div>
-        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
                   <th className="py-3 px-4 font-bold">Sana</th>
-                  <th className="py-3 px-4 font-bold">Turi</th>
-                  <th className="py-3 px-4 font-bold">Izoh / Tafsilot</th>
-                  <th className="py-3 px-4 font-bold">Masofa (km)</th>
+                  <th className="py-3 px-4 font-bold">Toifa</th>
+                  <th className="py-3 px-4 font-bold">Izoh</th>
                   <th className="py-3 px-4 font-bold">Summa</th>
+                  <th className="py-3 px-4 font-bold text-right">Amallar</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {expenses.map((exp) => (
                   <tr key={exp.id} className="hover:bg-slate-50 transition">
                     <td className="py-3 px-4 font-medium text-slate-500">{exp.date}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                        exp.category === 'GAZ' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-slate-100 text-slate-800'
-                      }`}>
-                        {exp.category === 'GAZ' ? '⛽ GAZ' : '📌 BOSHQA'}
-                      </span>
-                    </td>
+                    <td className="py-3 px-4 font-bold text-slate-800">{exp.category}</td>
                     <td className="py-3 px-4 font-medium">{exp.description || '-'}</td>
-                    <td className="py-3 px-4">{exp.distance_km ? `${exp.distance_km} km` : '-'}</td>
-                    <td className="py-3 px-4 font-extrabold text-rose-600 text-sm">
-                      -{exp.amount?.toLocaleString()} so'm
+                    <td className="py-3 px-4 font-extrabold text-rose-600">-{exp.amount?.toLocaleString()} so'm</td>
+                    <td className="py-3 px-4 text-right space-x-2">
+                      <button onClick={() => handleEditExpense(exp)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDeleteExpense(exp.id)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* XARAJAT QO'SHISH MODALI */}
+      {activeTab === 'CATEGORIES' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden max-w-2xl">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-800">Xarajat Toifalari</h3>
+            <button onClick={() => { setEditingCat(null); setCatName(''); setShowCatModal(true); }} className="flex items-center space-x-1.5 px-3.5 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold transition">
+              <Plus className="w-3.5 h-3.5" />
+              <span>Toifa Qo'shish</span>
+            </button>
+          </div>
+          <div className="p-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {expenseCategories.map(cat => (
+                <div key={cat.id} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="font-bold text-slate-700 text-xs">{cat.name}</span>
+                  <div className="flex space-x-1">
+                    <button onClick={() => handleEditCat(cat)} className="p-1 text-blue-600 hover:bg-blue-100 rounded"><Edit2 className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleDeleteCat(cat.id)} className="p-1 text-rose-600 hover:bg-rose-100 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'FOUNDERS' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-800 flex items-center space-x-2">
+              <Users className="w-5 h-5 text-indigo-600" />
+              <span>Ta'sischilar Balansi</span>
+            </h3>
+            <button onClick={() => { setSelectedFounderId(founders[0]?.id || ''); setFounderAmount(''); setFounderNotes(''); setShowFounderModal(true); }} className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold transition shadow-sm">
+              <Plus className="w-3.5 h-3.5" />
+              <span>Pul Yechish (Divident)</span>
+            </button>
+          </div>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {founders.map(f => (
+              <div key={f.id} className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-center">
+                <div className="text-indigo-800 font-extrabold text-sm mb-1">{f.name}</div>
+                <div className={`text-xl font-black ${f.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {f.balance?.toLocaleString()} <span className="text-xs font-normal">so'm</span>
+                </div>
+                <div className="text-[10px] text-indigo-400 font-medium uppercase mt-1">Joriy qoldiq</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {showExpenseModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-            <div className="border-b border-slate-100 pb-2">
-              <h3 className="text-base font-bold text-slate-800">Yangi Xarajat Kiritish</h3>
-            </div>
-
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-slate-800 mb-4">{editingExpense ? 'Xarajatni Tahrirlash' : 'Yangi Xarajat'}</h3>
             <form onSubmit={handleAddExpense} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Xarajat turi:</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setExpenseCategory('BOSHQA')}
-                    className={`py-2 rounded-xl text-xs font-bold border transition ${
-                      expenseCategory === 'BOSHQA'
-                        ? 'bg-slate-800 text-white border-slate-800'
-                        : 'bg-slate-50 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    Boshqa Chiqim
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setExpenseCategory('GAZ')}
-                    className={`py-2 rounded-xl text-xs font-bold border transition ${
-                      expenseCategory === 'GAZ'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-slate-50 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    Gaz / Yoqilg'i
-                  </button>
-                </div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Toifa:</label>
+                <select value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+                  {expenseCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Summasi (so'm) *:</label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                  placeholder="Masalan: 35000"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold"
-                />
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Summasi (so'm):</label>
+                <input type="number" required value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" />
               </div>
-
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Sana:</label>
+                <input type="date" required value={expenseDate} onChange={(e) => setExpenseDate(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Izoh:</label>
-                <input
-                  type="text"
-                  value={expenseDesc}
-                  onChange={(e) => setExpenseDesc(e.target.value)}
-                  placeholder="Masalan: Tushlik yoki Mayda ehtiyot qism"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                />
+                <input type="text" value={expenseDesc} onChange={(e) => setExpenseDesc(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
               </div>
-
               <div className="pt-2 flex items-center justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowExpenseModal(false)}
-                  className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition"
-                >
-                  Saqlash
-                </button>
+                <button type="button" onClick={() => setShowExpenseModal(false)} className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Bekor qilish</button>
+                <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl">Saqlash</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showCatModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-slate-800 mb-4">{editingCat ? 'Toifani Tahrirlash' : 'Yangi Toifa'}</h3>
+            <form onSubmit={handleSaveCat} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Toifa nomi:</label>
+                <input type="text" required value={catName} onChange={(e) => setCatName(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" />
+              </div>
+              <div className="pt-2 flex items-center justify-end space-x-2">
+                <button type="button" onClick={() => setShowCatModal(false)} className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Bekor qilish</button>
+                <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl">Saqlash</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showFounderModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-slate-800 mb-4">Pul Yechish (Divident)</h3>
+            <form onSubmit={handleAddDividend} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Ta'sischi:</label>
+                <select value={selectedFounderId} onChange={(e) => setSelectedFounderId(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+                  {founders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Summa (so'm):</label>
+                <input type="number" required value={founderAmount} onChange={(e) => setFounderAmount(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Sana:</label>
+                <input type="date" required value={founderDate} onChange={(e) => setFounderDate(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Izoh (ixtiyoriy):</label>
+                <input type="text" value={founderNotes} onChange={(e) => setFounderNotes(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
+              </div>
+              <div className="pt-2 flex items-center justify-end space-x-2">
+                <button type="button" onClick={() => setShowFounderModal(false)} className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Bekor qilish</button>
+                <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl">Saqlash</button>
               </div>
             </form>
           </div>

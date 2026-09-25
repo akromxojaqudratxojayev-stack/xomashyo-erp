@@ -5,6 +5,7 @@ import DastafkaView from './components/DastafkaView';
 import AdminStoresView from './components/AdminStoresView';
 import SalesView from './components/SalesView';
 import FinancialView from './components/FinancialView';
+import ReconciliationView from './components/ReconciliationView';
 import { Download, Smartphone } from 'lucide-react';
 
 export default function App() {
@@ -99,6 +100,7 @@ export default function App() {
         {activeTab === 'sales' && <SalesView currentUser={currentUser} />}
         {activeTab === 'finance' && <FinancialView currentUser={currentUser} />}
         {activeTab === 'settings' && <FinancialView currentUser={currentUser} />}
+        {activeTab === 'reconciliation' && <ReconciliationView />}
       </main>
 
     </div>

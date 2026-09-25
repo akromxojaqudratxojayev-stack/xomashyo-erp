@@ -26,6 +26,7 @@ export default function AdminStoresView() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [contactPerson, setContactPerson] = useState('');
+  const [networkName, setNetworkName] = useState('');
   const [lat, setLat] = useState('41.2995'); // Standart Toshkent
   const [lng, setLng] = useState('69.2401');
   const [locationInput, setLocationInput] = useState('');
@@ -87,6 +88,7 @@ export default function AdminStoresView() {
         phone,
         address,
         contact_person: contactPerson,
+        network_name: networkName,
         lat: parseFloat(lat),
         lng: parseFloat(lng)
       };
@@ -167,6 +169,7 @@ export default function AdminStoresView() {
     setPhone('');
     setAddress('');
     setContactPerson('');
+    setNetworkName('');
     setLat('41.2995');
     setLng('69.2401');
     setLocationInput('');
@@ -178,6 +181,7 @@ export default function AdminStoresView() {
     setPhone(store.phone || '');
     setAddress(store.address || '');
     setContactPerson(store.contact_person || '');
+    setNetworkName(store.network_name || '');
     setLat(store.lat.toString());
     setLng(store.lng.toString());
     setLocationInput('');
@@ -187,10 +191,14 @@ export default function AdminStoresView() {
   const handleDeleteClick = async (id) => {
     if (!window.confirm('Haqiqatan ham bu do\'konni o\'chirmoqchimisiz?')) return;
     try {
-      await fetch(`/api/stores/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/stores/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Server xatosi');
+      }
       loadData();
     } catch (err) {
-      alert('Xatolik: ' + err.message);
+      alert('O\'chirishda xatolik: ' + err.message);
     }
   };
 
@@ -220,9 +228,10 @@ export default function AdminStoresView() {
 
   // Filtrlash
   const filteredStores = stores.filter(s => 
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    (s.name && s.name.toLowerCase().includes(search.toLowerCase())) ||
     (s.address && s.address.toLowerCase().includes(search.toLowerCase())) ||
-    (s.contact_person && s.contact_person.toLowerCase().includes(search.toLowerCase()))
+    (s.contact_person && s.contact_person.toLowerCase().includes(search.toLowerCase())) ||
+    (s.network_name && s.network_name.toLowerCase().includes(search.toLowerCase()))
   );
 
   const isStoreInTodayDelivery = (storeId) => {
@@ -320,6 +329,11 @@ export default function AdminStoresView() {
                         />
                       )}
                       <h3 className="text-base font-bold text-slate-900">{store.name}</h3>
+                      {store.network_name && (
+                        <span className="ml-2 bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          {store.network_name}
+                        </span>
+                      )}
                     </div>
 
                     {inToday ? (
@@ -441,6 +455,18 @@ export default function AdminStoresView() {
                     value={contactPerson}
                     onChange={(e) => setContactPerson(e.target.value)}
                     placeholder="Masalan: Alisher aka"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                  />
+                </div>
+                <div className="col-span-1 md:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Set (Tarmoq) nomi
+                  </label>
+                  <input
+                    type="text"
+                    value={networkName}
+                    onChange={(e) => setNetworkName(e.target.value)}
+                    placeholder="Masalan: Fikx, Havas (Bitta xo'jayinga tegishli do'konlar)"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                   />
                 </div>

@@ -6,7 +6,8 @@ import {
   Wallet, 
   Settings, 
   LogOut, 
-  UserCheck 
+  UserCheck,
+  FileCheck
 } from 'lucide-react';
 
 export default function Navbar({ currentUser, activeTab, setActiveTab, onLogout }) {
@@ -28,6 +29,7 @@ export default function Navbar({ currentUser, activeTab, setActiveTab, onLogout 
     { id: 'stores', label: 'Do\'konlar', icon: Store },
     { id: 'sales', label: 'Sotuv', icon: TrendingUp },
     { id: 'finance', label: 'Kassa & Moliya', icon: Wallet },
+    { id: 'reconciliation', label: 'Sverka (Oyni Yopish)', icon: FileCheck },
     { id: 'settings', label: 'Sozlamalar', icon: Settings },
   ];
 
