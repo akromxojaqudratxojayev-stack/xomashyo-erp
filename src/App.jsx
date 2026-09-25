@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
 import Navbar from './components/Navbar';
 import DastafkaView from './components/DastafkaView';
@@ -6,6 +6,7 @@ import AdminStoresView from './components/AdminStoresView';
 import SalesView from './components/SalesView';
 import FinancialView from './components/FinancialView';
 import ReconciliationView from './components/ReconciliationView';
+import SettingsView from './components/SettingsView';
 import { Download, Smartphone } from 'lucide-react';
 
 export default function App() {
@@ -23,7 +24,6 @@ export default function App() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   useEffect(() => {
-    // Agar dastafchik bo'lsa dastafka tabini, hisobchi bo'lsa moliya tabini ochish
     if (currentUser) {
       if (currentUser.role === 'dastafchik') {
         setActiveTab('dastafka');
@@ -35,7 +35,6 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // PWA (Telefon ekraniga o'rnatish) hodisasi
   useEffect(() => {
     const handleBeforeInstall = (e) => {
       e.preventDefault();
@@ -69,7 +68,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100/70 flex flex-col">
       
-      {/* PWA O'rnatish Banneri (Telefonlar uchun) */}
       {showInstallBanner && (
         <div className="bg-emerald-700 text-white px-4 py-2.5 flex items-center justify-between shadow-md text-xs sm:text-sm">
           <div className="flex items-center space-x-2">
@@ -85,7 +83,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Yuqori Navigatsiya */}
       <Navbar
         currentUser={currentUser}
         activeTab={activeTab}
@@ -93,13 +90,12 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      {/* Asosiy Kontent Bo'limi */}
       <main className="flex-1 pb-16 md:pb-8">
         {activeTab === 'dastafka' && <DastafkaView currentUser={currentUser} />}
         {activeTab === 'stores' && <AdminStoresView currentUser={currentUser} />}
         {activeTab === 'sales' && <SalesView currentUser={currentUser} />}
         {activeTab === 'finance' && <FinancialView currentUser={currentUser} />}
-        {activeTab === 'settings' && <FinancialView currentUser={currentUser} />}
+        {activeTab === 'settings' && <SettingsView currentUser={currentUser} />}
         {activeTab === 'reconciliation' && <ReconciliationView />}
       </main>
 
