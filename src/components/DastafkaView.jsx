@@ -15,7 +15,7 @@ import {
   ExternalLink,
   Edit3,
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, GeoJSON } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 
 const createNumberedIcon = (number) => {
@@ -36,6 +36,7 @@ const currentPosIcon = divIcon({
 
 export default function DastafkaView({ currentUser }) {
   const [deliveries, setDeliveries] = useState([]);
+  const [osrmRoute, setOsrmRoute] = useState(null);
   const [trip, setTrip] = useState(null);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +62,30 @@ export default function DastafkaView({ currentUser }) {
   const [manualKm, setManualKm] = useState('');
 
   // Ma'lumotlarni yuklash
+  
+  useEffect(() => {
+    if (deliveries.length > 0 && currentCoords?.lat) {
+      const uncompleted = deliveries.filter(d => d.status === 'KUTILMOQDA' && d.store_lat);
+      if (uncompleted.length === 0) {
+        setOsrmRoute(null);
+        return;
+      }
+      
+      const points = [{lat: currentCoords.lat, lng: currentCoords.lng}, ...uncompleted.map(d => ({lat: d.store_lat, lng: d.store_lng}))];
+      if (points.length > 25) points.length = 25; // OSRM max 25 points
+      
+      const coordString = points.map(p => `${p.lng},${p.lat}`).join(';');
+      fetch(`https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.code === 'Ok') {
+            setOsrmRoute(data.routes[0].geometry);
+          }
+        })
+        .catch(err => console.error("OSRM xatosi:", err));
+    }
+  }, [deliveries, currentCoords]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -288,17 +313,17 @@ export default function DastafkaView({ currentUser }) {
       points.push({ lat: d.store_lat, lng: d.store_lng });
     });
 
-    if (type === 'yandex') {
-      if (points.length === 0) return;
-      
-      // Yandex Navi deep link faqat 1 ta oraliq manzilni (via) qabul qiladi! 
-      // Shuning uchun ssilkani oddiy https://yandex.ru/maps... shaklida beramiz.
-      // Telefonning o'zi buni Navigator ilovasiga uzatadi va hamma 10 ta manzilni ham oladi.
+    if (type === 'google') {
       const fallbackPoints = points.map(p => `${p.lat},${p.lng}`);
-      const fallbackUrl = `https://yandex.com/maps/?rtext=${fallbackPoints.join('~')}&rtt=auto`;
-      window.open(fallbackUrl, '_blank');
-
+      const url = `https://www.google.com/maps/dir/${fallbackPoints.join('/')}`;
+      window.open(url, '_blank');
+    } else if (type === '2gis') {
+      // 2GIS koordinatalarni Lng,Lat shaklida qabul qiladi
+      const dgisPoints = points.map(p => `${p.lng}%2C${p.lat}`);
+      const url = `https://2gis.uz/tashkent/directions/points/${dgisPoints.join(';')}`;
+      window.open(url, '_blank');
     } else {
+      // Fallback to Google if unknown
       const fallbackPoints = points.map(p => `${p.lat},${p.lng}`);
       const url = `https://www.google.com/maps/dir/${fallbackPoints.join('/')}`;
       window.open(url, '_blank');
