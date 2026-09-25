@@ -13,13 +13,12 @@ import {
   RotateCcw,
   Sparkles,
   ExternalLink,
-  Edit3,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-import { divIcon } from 'leaflet';
+import L from 'leaflet';
 
 const createNumberedIcon = (number) => {
-  return divIcon({
+  return L.divIcon({
     className: 'custom-div-icon',
     html: `<div style="background-color: #059669; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; justify-content: center; align-items: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${number}</div>`,
     iconSize: [24, 24],
@@ -27,7 +26,7 @@ const createNumberedIcon = (number) => {
   });
 };
 
-const currentPosIcon = divIcon({
+const currentPosIcon = L.divIcon({
   className: 'custom-div-icon',
   html: `<div style="background-color: #3b82f6; border-radius: 50%; width: 16px; height: 16px; border: 3px solid white; box-shadow: 0 0 0 2px #3b82f6, 0 2px 4px rgba(0,0,0,0.3);"></div>`,
   iconSize: [16, 16],
