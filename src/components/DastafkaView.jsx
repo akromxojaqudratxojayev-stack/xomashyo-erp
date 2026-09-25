@@ -275,18 +275,52 @@ export default function DastafkaView({ currentUser }) {
     if (validPoints.length === 0) return alert('GPS koordinatalar yo\'q!');
 
     const points = [];
-    if (!store && currentCoords?.lat) {
-      points.push(`${currentCoords.lat},${currentCoords.lng}`);
+    
+    // HAMISHA JORIY LOKATSIYANI 1-NUQTA SIFATIDA QO'SHISH
+    if (currentCoords?.lat) {
+      points.push({ lat: currentCoords.lat, lng: currentCoords.lng });
+    } else {
+      // Agar GPS topilmasa
+      alert("Diqqat: Sizning GPS lokatsiyangiz aniqlanmadi, xaritada hozirgi joyingiz ko'rinmasligi mumkin. Telefoningizda Lokatsiya(GPS) yoqilganligini tekshiring.");
     }
+    
     validPoints.forEach(d => {
-      points.push(`${d.store_lat},${d.store_lng}`);
+      points.push({ lat: d.store_lat, lng: d.store_lng });
     });
 
     if (type === 'yandex') {
-      const url = `https://yandex.com/maps/?rtext=${points.join('~')}&rtt=auto`;
-      window.open(url, '_blank');
+      if (points.length === 0) return;
+      
+      const end = points[points.length - 1];
+      let naviUrl = `yandexnavi://build_route_on_map?lat_to=${end.lat}&lon_to=${end.lng}`;
+      
+      if (points.length > 1) {
+        const start = points[0];
+        naviUrl += `&lat_from=${start.lat}&lon_from=${start.lng}`;
+        
+        // O'rtadagi manzillar
+        for (let i = 1; i < points.length - 1; i++) {
+          naviUrl += `&lat_via_${i-1}=${points[i].lat}&lon_via_${i-1}=${points[i].lng}`;
+        }
+      }
+      
+      // Fallback url
+      const fallbackPoints = points.map(p => `${p.lat},${p.lng}`);
+      const fallbackUrl = `https://yandex.com/maps/?rtext=${fallbackPoints.join('~')}&rtt=auto`;
+      
+      // Try opening the Yandex Navigator app
+      const startTime = Date.now();
+      window.location.href = naviUrl;
+      
+      setTimeout(() => {
+        if (Date.now() - startTime < 1500) {
+          window.open(fallbackUrl, '_blank');
+        }
+      }, 500);
+
     } else {
-      const url = `https://www.google.com/maps/dir/${points.join('/')}`;
+      const fallbackPoints = points.map(p => `${p.lat},${p.lng}`);
+      const url = `https://www.google.com/maps/dir/${fallbackPoints.join('/')}`;
       window.open(url, '_blank');
     }
   };
