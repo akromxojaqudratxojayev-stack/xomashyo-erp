@@ -291,32 +291,12 @@ export default function DastafkaView({ currentUser }) {
     if (type === 'yandex') {
       if (points.length === 0) return;
       
-      const end = points[points.length - 1];
-      let naviUrl = `yandexnavi://build_route_on_map?lat_to=${end.lat}&lon_to=${end.lng}`;
-      
-      if (points.length > 1) {
-        const start = points[0];
-        naviUrl += `&lat_from=${start.lat}&lon_from=${start.lng}`;
-        
-        // O'rtadagi manzillar
-        for (let i = 1; i < points.length - 1; i++) {
-          naviUrl += `&lat_via_${i-1}=${points[i].lat}&lon_via_${i-1}=${points[i].lng}`;
-        }
-      }
-      
-      // Fallback url
+      // Yandex Navi deep link faqat 1 ta oraliq manzilni (via) qabul qiladi! 
+      // Shuning uchun ssilkani oddiy https://yandex.ru/maps... shaklida beramiz.
+      // Telefonning o'zi buni Navigator ilovasiga uzatadi va hamma 10 ta manzilni ham oladi.
       const fallbackPoints = points.map(p => `${p.lat},${p.lng}`);
       const fallbackUrl = `https://yandex.com/maps/?rtext=${fallbackPoints.join('~')}&rtt=auto`;
-      
-      // Try opening the Yandex Navigator app
-      const startTime = Date.now();
-      window.location.href = naviUrl;
-      
-      setTimeout(() => {
-        if (Date.now() - startTime < 1500) {
-          window.open(fallbackUrl, '_blank');
-        }
-      }, 500);
+      window.open(fallbackUrl, '_blank');
 
     } else {
       const fallbackPoints = points.map(p => `${p.lat},${p.lng}`);
