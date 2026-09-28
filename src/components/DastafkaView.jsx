@@ -664,7 +664,7 @@ export default function DastafkaView({ currentUser }) {
                         {isPostponed && (
                           <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold flex items-center space-x-1">
                             <Clock className="w-3 h-3" />
-                            <span>Ertaga qoldirildi</span>
+                            <span>Otkaz qilingan</span>
                           </span>
                         )}
                       </div>
@@ -742,7 +742,7 @@ export default function DastafkaView({ currentUser }) {
                       }}
                       className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-semibold transition"
                     >
-                      ⏳ Tayyormas (Ertaga surish)
+                      ❌ Otkaz (Tayyormas)
                     </button>
 
                     <button
@@ -919,7 +919,7 @@ export default function DastafkaView({ currentUser }) {
                   type="submit"
                   className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow transition"
                 >
-                  ⏳ Ertaga o'tkazish
+                  ❌ Otkaz qilish
                 </button>
               </div>
             </form>

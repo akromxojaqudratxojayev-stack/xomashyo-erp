@@ -330,9 +330,9 @@ app.post('/api/deliveries/:id/postpone', async (req, res) => {
     // Bugungi yozuvni 'TAYYORMAS' ga o'tkazish
     await db.prepare(`
       UPDATE deliveries 
-      SET status = 'TAYYORMAS', postponed_reason = ?, postponed_date = ?
+      SET status = 'TAYYORMAS', postponed_reason = ?, postponed_date = ?, date = ?
       WHERE id = ?
-    `).run(reason || 'Mahsulot tayyor emas / Magazin yopiq', tomorrow, id);
+    `).run(reason || 'Mahsulot tayyor emas / Magazin yopiq', tomorrow, getTodayDate(), id);
 
     // Ertangi kun uchun yangi reysga avtomat qo'shish (agar ertaga allaqachon mavjud bo'lmasa)
     const existsTomorrow = await db.prepare('SELECT id FROM deliveries WHERE store_id = ? AND date = ?').get(current.store_id, tomorrow);
