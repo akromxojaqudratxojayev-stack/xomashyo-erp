@@ -363,19 +363,20 @@ app.get('/api/trip/today', async (req, res) => {
       trip = { id: resInsert.lastInsertRowid, date: today, total_km: 0, gas_spent_sum: 0, is_active: 1 };
     }
 
-    // Gaz narxi va km normasi
-    const refillPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
-    const refillKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
-    const costPerKm = refillPrice / refillKm;
-
+    const rPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+    const rKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
+    let remainingKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_remaining_km'))?.value || rKm);
+    
     res.json({
       ...trip,
-      refillPrice,
-      refillKm,
-      costPerKm: Math.round(costPerKm)
+      refillPrice: rPrice,
+      refillKm: rKm,
+      gasRemaining: Math.round(remainingKm)
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
   }
 });
 
@@ -389,52 +390,63 @@ app.post('/api/trip/update-location', async (req, res) => {
 
     const today = getTodayDate();
     let trip = await db.prepare('SELECT * FROM driver_trips WHERE date = ?').get(today);
+    
+    const rPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+    const rKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
+    let remainingKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_remaining_km'))?.value || rKm);
+    
     if (!trip) {
       await db.prepare('INSERT INTO driver_trips (date, total_km, gas_spent_sum, last_lat, last_lng, is_active) VALUES (?, 0, 0, ?, ?, 1)').run(today, lat, lng);
       trip = await db.prepare('SELECT * FROM driver_trips WHERE date = ?').get(today);
-      return res.json({ trip, addedKm: 0 });
+      return res.json({ trip: { ...trip, refillPrice: rPrice, refillKm: rKm, gasRemaining: remainingKm }, addedKm: 0 });
     }
 
     let addedKm = 0;
     if (trip.last_lat && trip.last_lng) {
       addedKm = calculateDistance(trip.last_lat, trip.last_lng, lat, lng);
-      // Agar juda kichik siljish bo'lsa (50 metrdan kam), hisobga olmaslik (GPS shovqini)
       if (addedKm < 0.05) addedKm = 0;
-      // Agar 1 ta sakrash 50 kmdan ortiq bo'lsa (GPS xatosi), hisobga olmaslik
       if (addedKm > 50) addedKm = 0;
     }
 
     const newTotalKm = Math.round((trip.total_km + addedKm) * 10) / 10;
+    
+    let totalGasSpent = trip.gas_spent_sum;
 
-    const refillPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
-    const refillKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
-    const costPerKm = refillPrice / refillKm;
-    const gasSpent = Math.round(newTotalKm * costPerKm);
+    if (addedKm > 0) {
+      remainingKm -= addedKm;
+      // Agar bak tugasa (0 dan kamayib ketsa) yangi zapravka olamiz
+      let zapravkaCount = 0;
+      while (remainingKm <= 0) {
+        remainingKm += rKm;
+        totalGasSpent += rPrice;
+        zapravkaCount++;
+      }
+      
+      // Yangi qoldiqni saqlaymiz
+      await db.prepare("UPDATE settings SET value = ? WHERE key = 'gas_remaining_km'").run(remainingKm);
+      
+      // Agar yangi zapravka xarid qilingan bo'lsa, uni alohida harajatga yozamiz
+      if (zapravkaCount > 0) {
+        const expenseAmount = zapravkaCount * rPrice;
+        // Buni har doim alohida qator qilib yozamiz, chunki bu alohida bak tuldirish!
+        await db.prepare("INSERT INTO expenses (date, category, amount, description) VALUES (?, 'GAZ', ?, ?)").run(today, expenseAmount, `Avtomat Zapravka (${zapravkaCount} marta to'liq)`);
+      }
+    }
 
     await db.prepare(`
       UPDATE driver_trips
       SET total_km = ?, gas_spent_sum = ?, last_lat = ?, last_lng = ?, updated_at = NOW()
       WHERE id = ?
-    `).run(newTotalKm, gasSpent, lat, lng, trip.id);
-
-    // Xarajatlar jadvalida bugungi gazni sinxronlashtirish
-    const existingExpense = await db.prepare("SELECT id FROM expenses WHERE date = ? AND category = 'GAZ'").get(today);
-    if (existingExpense) {
-      await db.prepare('UPDATE expenses SET amount = ?, distance_km = ?, description = ? WHERE id = ?')
-        .run(gasSpent, newTotalKm, `GPS orqali gaz (${newTotalKm} km)`, existingExpense.id);
-    } else if (gasSpent > 0) {
-      await db.prepare("INSERT INTO expenses (date, category, amount, distance_km, description) VALUES (?, 'GAZ', ?, ?, ?)")
-        .run(today, gasSpent, newTotalKm, `GPS orqali gaz (${newTotalKm} km)`);
-    }
+    `).run(newTotalKm, totalGasSpent, lat, lng, trip.id);
 
     res.json({
-      success: true,
-      total_km: newTotalKm,
-      gas_spent_sum: gasSpent,
-      addedKm: Math.round(addedKm * 100) / 100
+      trip: { ...trip, total_km: newTotalKm, gas_spent_sum: totalGasSpent, last_lat: lat, last_lng: lng, refillPrice: rPrice, refillKm: rKm, gasRemaining: Math.round(remainingKm) },
+      addedKm
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
   }
 });
 
@@ -445,31 +457,50 @@ app.post('/api/trip/manual-km', async (req, res) => {
     const km = Number(total_km) || 0;
     const today = getTodayDate();
 
-    const refillPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
-    const refillKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
-    const costPerKm = refillPrice / refillKm;
-    const gasSpent = Math.round(km * costPerKm);
+    const rPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+    const rKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
+    let remainingKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_remaining_km'))?.value || rKm);
 
     let trip = await db.prepare('SELECT * FROM driver_trips WHERE date = ?').get(today);
+    
+    let addedKm = 0;
+    if (trip) {
+      addedKm = km - trip.total_km;
+      if (addedKm < 0) addedKm = 0; // Agar orqaga qaytarsa, qoldiqqa tasir qilmaymiz
+    } else {
+      addedKm = km;
+    }
+    
+    let totalGasSpent = trip ? trip.gas_spent_sum : 0;
+
+    if (addedKm > 0) {
+      remainingKm -= addedKm;
+      let zapravkaCount = 0;
+      while (remainingKm <= 0) {
+        remainingKm += rKm;
+        totalGasSpent += rPrice;
+        zapravkaCount++;
+      }
+      
+      await db.prepare("UPDATE settings SET value = ? WHERE key = 'gas_remaining_km'").run(remainingKm);
+      
+      if (zapravkaCount > 0) {
+        const expenseAmount = zapravkaCount * rPrice;
+        await db.prepare("INSERT INTO expenses (date, category, amount, description) VALUES (?, 'GAZ', ?, ?)").run(today, expenseAmount, `Avtomat Zapravka (Qo'lda, ${zapravkaCount} marta to'liq)`);
+      }
+    }
+
     if (!trip) {
-      await db.prepare('INSERT INTO driver_trips (date, total_km, gas_spent_sum, is_active) VALUES (?, ?, ?, 1)').run(today, km, gasSpent);
+      await db.prepare('INSERT INTO driver_trips (date, total_km, gas_spent_sum, is_active) VALUES (?, ?, ?, 1)').run(today, km, totalGasSpent);
     } else {
-      await db.prepare("UPDATE driver_trips SET total_km = ?, gas_spent_sum = ?, updated_at = NOW() WHERE id = ?").run(km, gasSpent, trip.id);
+      await db.prepare("UPDATE driver_trips SET total_km = ?, gas_spent_sum = ?, updated_at = NOW() WHERE id = ?").run(km, totalGasSpent, trip.id);
     }
 
-    // Xarajatga yozish
-    const existingExpense = await db.prepare("SELECT id FROM expenses WHERE date = ? AND category = 'GAZ'").get(today);
-    if (existingExpense) {
-      await db.prepare('UPDATE expenses SET amount = ?, distance_km = ?, description = ? WHERE id = ?')
-        .run(gasSpent, km, `Spidometr bo'yicha gaz (${km} km)`, existingExpense.id);
-    } else {
-      await db.prepare("INSERT INTO expenses (date, category, amount, distance_km, description) VALUES (?, 'GAZ', ?, ?, ?)")
-        .run(today, gasSpent, km, `Spidometr bo'yicha gaz (${km} km)`);
-    }
-
-    res.json({ success: true, total_km: km, gas_spent_sum: gasSpent });
+    res.json({ success: true, total_km: km, gas_spent_sum: totalGasSpent, gasRemaining: Math.round(remainingKm) });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
   }
 });
 
@@ -877,10 +908,13 @@ app.post('/api/trip/update-location', async (req, res) => {
     const today = getTodayDate();
     let trip = await db.prepare('SELECT * FROM driver_trips WHERE date = ?').get(today);
     if (!trip) {
-      await db.prepare('INSERT INTO driver_trips (date, total_km, gas_spent_sum, last_lat, last_lng, is_active) VALUES (?, 0, 0, ?, ?, 1)').run(today, lat, lng);
-      trip = await db.prepare('SELECT * FROM driver_trips WHERE date = ?').get(today);
-      return res.json({ trip, addedKm: 0 });
-    }
+        await db.prepare('INSERT INTO driver_trips (date, total_km, gas_spent_sum, last_lat, last_lng, is_active) VALUES (?, 0, 0, ?, ?, 1)').run(today, lat, lng);
+        trip = await db.prepare('SELECT * FROM driver_trips WHERE date = ?').get(today);
+        
+        const rPrice = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_price'))?.value || 85000);
+        const rKm = Number((await db.prepare('SELECT value FROM settings WHERE key = ?').get('gas_refill_km'))?.value || 220);
+        return res.json({ trip: { ...trip, refillPrice: rPrice, refillKm: rKm, costPerKm: Math.round(rPrice/rKm) }, addedKm: 0 });
+      }
 
     let addedKm = 0;
     if (trip.last_lat && trip.last_lng) {
@@ -905,21 +939,22 @@ app.post('/api/trip/update-location', async (req, res) => {
     `).run(newTotalKm, gasSpent, lat, lng, trip.id);
 
     // Xarajatlar jadvalida bugungi gazni sinxronlashtirish
-    const existingExpense = await db.prepare("SELECT id FROM expenses WHERE date = ? AND category = 'GAZ'").get(today);
-    if (existingExpense) {
-      await db.prepare('UPDATE expenses SET amount = ?, distance_km = ?, description = ? WHERE id = ?')
-        .run(gasSpent, newTotalKm, `GPS orqali gaz (${newTotalKm} km)`, existingExpense.id);
-    } else if (gasSpent > 0) {
-      await db.prepare("INSERT INTO expenses (date, category, amount, distance_km, description) VALUES (?, 'GAZ', ?, ?, ?)")
-        .run(today, gasSpent, newTotalKm, `GPS orqali gaz (${newTotalKm} km)`);
+    if (gasSpent > 0) {
+      await db.prepare(`
+        INSERT INTO expenses (date, category, amount, distance_km, description)
+        VALUES (?, 'GAZ', ?, ?, ?)
+        ON CONFLICT (date, category) WHERE category = 'GAZ'
+        DO UPDATE SET 
+          amount = EXCLUDED.amount,
+          distance_km = EXCLUDED.distance_km,
+          description = EXCLUDED.description
+      `).run(today, gasSpent, newTotalKm, `GPS orqali gaz (${newTotalKm} km)`);
     }
 
     res.json({
-      success: true,
-      total_km: newTotalKm,
-      gas_spent_sum: gasSpent,
-      addedKm: Math.round(addedKm * 100) / 100
-    });
+        trip: { ...trip, total_km: newTotalKm, gas_spent_sum: gasSpent, last_lat: lat, last_lng: lng, refillPrice, refillKm, costPerKm: Math.round(costPerKm) },
+        addedKm
+      });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -945,13 +980,16 @@ app.post('/api/trip/manual-km', async (req, res) => {
     }
 
     // Xarajatga yozish
-    const existingExpense = await db.prepare("SELECT id FROM expenses WHERE date = ? AND category = 'GAZ'").get(today);
-    if (existingExpense) {
-      await db.prepare('UPDATE expenses SET amount = ?, distance_km = ?, description = ? WHERE id = ?')
-        .run(gasSpent, km, `Spidometr bo'yicha gaz (${km} km)`, existingExpense.id);
-    } else {
-      await db.prepare("INSERT INTO expenses (date, category, amount, distance_km, description) VALUES (?, 'GAZ', ?, ?, ?)")
-        .run(today, gasSpent, km, `Spidometr bo'yicha gaz (${km} km)`);
+    if (gasSpent > 0) {
+      await db.prepare(`
+        INSERT INTO expenses (date, category, amount, distance_km, description)
+        VALUES (?, 'GAZ', ?, ?, ?)
+        ON CONFLICT (date, category) WHERE category = 'GAZ'
+        DO UPDATE SET 
+          amount = EXCLUDED.amount,
+          distance_km = EXCLUDED.distance_km,
+          description = EXCLUDED.description
+      `).run(today, gasSpent, km, `Spidometr bo'yicha gaz (${km} km)`);
     }
 
     res.json({ success: true, total_km: km, gas_spent_sum: gasSpent });

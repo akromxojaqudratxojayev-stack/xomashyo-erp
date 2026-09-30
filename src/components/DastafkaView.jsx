@@ -467,8 +467,9 @@ export default function DastafkaView({ currentUser }) {
             <div>
               <h2 className="text-lg font-bold">Gaz va GPS Masofa Hisoblagich</h2>
               <p className="text-xs text-slate-400">
-                1 ta to'liq zapravka: <span className="text-emerald-300 font-semibold">{trip?.refillPrice?.toLocaleString()} so'm</span> ({trip?.refillKm} km ga yetadi)
-              </p>
+                  Zaxiradagi Gaz: <span className="text-emerald-300 font-semibold text-sm">{trip?.gasRemaining} km</span> qoldi. 
+                  (Tugasa avtomat {trip?.refillPrice?.toLocaleString()} so'm xarajatga yoziladi)
+                </p>
             </div>
           </div>
 
