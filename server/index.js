@@ -444,9 +444,6 @@ app.post('/api/trip/update-location', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
-  }
-});
 
 // Qo'lda spidometr km kiritish (agar haydovchi GPS o'rniga qo'lda kiritmoqchi bo'lsa)
 app.post('/api/trip/manual-km', async (req, res) => {
