@@ -377,7 +377,6 @@ app.get('/api/trip/today', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-  }
 });
 
 // GPS lokatsiyani yangilash va masofa qo'shish
