@@ -496,8 +496,6 @@ app.post('/api/trip/manual-km', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-  }
-});
 
 // ==========================================
 // 6. XOMASHYO SOTUV BO'LIMI (Zavod/Xaridorga)
