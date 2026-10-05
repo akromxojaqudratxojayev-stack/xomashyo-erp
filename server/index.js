@@ -377,8 +377,6 @@ app.get('/api/trip/today', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-  }
-});
 
 // GPS lokatsiyani yangilash va masofa qo'shish
 app.post('/api/trip/update-location', async (req, res) => {
@@ -447,8 +445,6 @@ app.post('/api/trip/update-location', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-  }
-});
 
 // Qo'lda spidometr km kiritish (agar haydovchi GPS o'rniga qo'lda kiritmoqchi bo'lsa)
 app.post('/api/trip/manual-km', async (req, res) => {
@@ -499,8 +495,6 @@ app.post('/api/trip/manual-km', async (req, res) => {
     res.json({ success: true, total_km: km, gas_spent_sum: totalGasSpent, gasRemaining: Math.round(remainingKm) });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
   }
 });
 
