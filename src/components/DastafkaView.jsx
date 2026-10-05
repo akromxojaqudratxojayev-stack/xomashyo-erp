@@ -42,7 +42,7 @@ export default function DastafkaView({ currentUser }) {
   const [loading, setLoading] = useState(true);
 
   // GPS holati
-  const [gpsActive, setGpsActive] = useState(false);
+  const [gpsActive, setGpsActive] = useState(() => localStorage.getItem('gpsActive') === 'true');
   const [currentCoords, setCurrentCoords] = useState(null);
   const [watchId, setWatchId] = useState(null);
 
@@ -115,22 +115,19 @@ export default function DastafkaView({ currentUser }) {
     loadData();
   }, []);
 
+  
   // GPS kuzatuvini boshqarish
-  const toggleGps = () => {
+  useEffect(() => {
+    let id = null;
     if (gpsActive) {
-      // O'chirish
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-      setGpsActive(false);
-      setWatchId(null);
-    } else {
-      // Yoqish
       if (!navigator.geolocation) {
-        alert('Qurilmangizda GPS geolokatsiya qo\'llab-quvvatlanmaydi');
+        alert("Qurilmangizda GPS geolokatsiya qo'llab-quvvatlanmaydi");
+        setGpsActive(false);
+        localStorage.setItem('gpsActive', 'false');
         return;
       }
-
-      setGpsActive(true);
-      const id = navigator.geolocation.watchPosition(
+      
+      id = navigator.geolocation.watchPosition(
         async (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
@@ -144,24 +141,43 @@ export default function DastafkaView({ currentUser }) {
               body: JSON.stringify({ lat, lng })
             });
             const data = await res.json();
-            if (data.success) {
-              setTrip(prev => ({
-                ...prev,
-                total_km: data.total_km,
-                gas_spent_sum: data.gas_spent_sum
-              }));
+            if (data.trip) {
+              setTrip(data.trip);
+            } else if (data.success) {
+               setTrip(prev => ({
+                 ...prev,
+                 total_km: data.total_km,
+                 gas_spent_sum: data.gas_spent_sum
+               }));
             }
           } catch (e) {
             console.error('GPS sinxronlashda xatolik:', e);
           }
         },
         (error) => {
-          console.warn('GPS xatosi:', error.message);
+          console.error("GPS Error:", error);
         },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
       );
       setWatchId(id);
+    } else {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+        setWatchId(null);
+      }
     }
+    
+    return () => {
+      if (id) navigator.geolocation.clearWatch(id);
+    };
+  }, [gpsActive]);
+
+  const toggleGps = () => {
+    setGpsActive(prev => {
+      const newVal = !prev;
+      localStorage.setItem('gpsActive', newVal.toString());
+      return newVal;
+    });
   };
 
   const [isSorting, setIsSorting] = useState(false);
