@@ -187,33 +187,69 @@ app.delete('/api/stores/:id', async (req, res) => {
 // 4. DASTAFKA VA REYS
 // ==========================================
 app.get('/api/deliveries', async (req, res) => {
-  try {
-    const date = req.query.date || getTodayDate();
-    const rows = await db.prepare(`
-      SELECT 
-        d.*,
-        s.name as store_name,
-        s.phone as store_phone,
-        s.address as store_address,
-        s.lat as store_lat,
-        s.lng as store_lng,
-        s.contact_person as store_contact
-      FROM deliveries d
-      JOIN stores s ON d.store_id = s.id
-      WHERE d.date = ?
-      ORDER BY 
-        CASE d.status
-          WHEN 'KUTILMOQDA' THEN 1
-          WHEN 'BAJARILDI' THEN 2
-          WHEN 'TAYYORMAS' THEN 3
-          ELSE 4
-        END,
-        d.order_index ASC, 
-        d.id ASC
-    `).all(date);
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    try {
+      const date = req.query.date || getTodayDate();
+      const isToday = date === getTodayDate();
+      
+      let query;
+      let params = [];
+      
+      if (isToday) {
+        query = `
+          SELECT 
+            d.*,
+            s.name as store_name,
+            s.phone as store_phone,
+            s.address as store_address,
+            s.lat as store_lat,
+            s.lng as store_lng,
+            s.contact_person as store_contact
+          FROM deliveries d
+          JOIN stores s ON d.store_id = s.id
+          WHERE d.date = ? OR (d.status = 'KUTILMOQDA' AND d.date < ?)
+          ORDER BY 
+            CASE d.status
+              WHEN 'KUTILMOQDA' THEN 1
+              WHEN 'BAJARILDI' THEN 2
+              WHEN 'TAYYORMAS' THEN 3
+              ELSE 4
+            END,
+            d.order_index ASC, 
+            d.id ASC
+        `;
+        params = [date, date];
+      } else {
+        query = `
+          SELECT 
+            d.*,
+            s.name as store_name,
+            s.phone as store_phone,
+            s.address as store_address,
+            s.lat as store_lat,
+            s.lng as store_lng,
+            s.contact_person as store_contact
+          FROM deliveries d
+          JOIN stores s ON d.store_id = s.id
+          WHERE d.date = ?
+          ORDER BY 
+            CASE d.status
+              WHEN 'KUTILMOQDA' THEN 1
+              WHEN 'BAJARILDI' THEN 2
+              WHEN 'TAYYORMAS' THEN 3
+              ELSE 4
+            END,
+            d.order_index ASC, 
+            d.id ASC
+        `;
+        params = [date];
+      }
+      
+      const rows = await db.prepare(query).all(...params);
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
   }
 });
 
@@ -297,9 +333,8 @@ app.post('/api/deliveries/:id/complete', async (req, res) => {
         paid_amount = ?,
         payment_type = ?,
         notes = ?,
-        completed_at = NOW()
-      WHERE id = ?
-    `).run(k_kg, s_kg, kartonPrice, salafanPrice, total, paid, payment_type || 'NAQD', notes || '', id);
+        completed_at = NOW(), date = ? WHERE id = ?
+    `).run(k_kg, s_kg, kartonPrice, salafanPrice, total, paid, payment_type || 'NAQD', notes || '', getTodayDate(), id);
 
     res.json({ 
       success: true, 
@@ -699,33 +734,69 @@ app.delete('/api/stores/:id', async (req, res) => {
 // 4. DASTAFKA VA REYS
 // ==========================================
 app.get('/api/deliveries', async (req, res) => {
-  try {
-    const date = req.query.date || getTodayDate();
-    const rows = await db.prepare(`
-      SELECT 
-        d.*,
-        s.name as store_name,
-        s.phone as store_phone,
-        s.address as store_address,
-        s.lat as store_lat,
-        s.lng as store_lng,
-        s.contact_person as store_contact
-      FROM deliveries d
-      JOIN stores s ON d.store_id = s.id
-      WHERE d.date = ?
-      ORDER BY 
-        CASE d.status
-          WHEN 'KUTILMOQDA' THEN 1
-          WHEN 'BAJARILDI' THEN 2
-          WHEN 'TAYYORMAS' THEN 3
-          ELSE 4
-        END,
-        d.order_index ASC, 
-        d.id ASC
-    `).all(date);
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    try {
+      const date = req.query.date || getTodayDate();
+      const isToday = date === getTodayDate();
+      
+      let query;
+      let params = [];
+      
+      if (isToday) {
+        query = `
+          SELECT 
+            d.*,
+            s.name as store_name,
+            s.phone as store_phone,
+            s.address as store_address,
+            s.lat as store_lat,
+            s.lng as store_lng,
+            s.contact_person as store_contact
+          FROM deliveries d
+          JOIN stores s ON d.store_id = s.id
+          WHERE d.date = ? OR (d.status = 'KUTILMOQDA' AND d.date < ?)
+          ORDER BY 
+            CASE d.status
+              WHEN 'KUTILMOQDA' THEN 1
+              WHEN 'BAJARILDI' THEN 2
+              WHEN 'TAYYORMAS' THEN 3
+              ELSE 4
+            END,
+            d.order_index ASC, 
+            d.id ASC
+        `;
+        params = [date, date];
+      } else {
+        query = `
+          SELECT 
+            d.*,
+            s.name as store_name,
+            s.phone as store_phone,
+            s.address as store_address,
+            s.lat as store_lat,
+            s.lng as store_lng,
+            s.contact_person as store_contact
+          FROM deliveries d
+          JOIN stores s ON d.store_id = s.id
+          WHERE d.date = ?
+          ORDER BY 
+            CASE d.status
+              WHEN 'KUTILMOQDA' THEN 1
+              WHEN 'BAJARILDI' THEN 2
+              WHEN 'TAYYORMAS' THEN 3
+              ELSE 4
+            END,
+            d.order_index ASC, 
+            d.id ASC
+        `;
+        params = [date];
+      }
+      
+      const rows = await db.prepare(query).all(...params);
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
   }
 });
 
@@ -809,9 +880,8 @@ app.post('/api/deliveries/:id/complete', async (req, res) => {
         paid_amount = ?,
         payment_type = ?,
         notes = ?,
-        completed_at = NOW()
-      WHERE id = ?
-    `).run(k_kg, s_kg, kartonPrice, salafanPrice, total, paid, payment_type || 'NAQD', notes || '', id);
+        completed_at = NOW(), date = ? WHERE id = ?
+    `).run(k_kg, s_kg, kartonPrice, salafanPrice, total, paid, payment_type || 'NAQD', notes || '', getTodayDate(), id);
 
     res.json({ 
       success: true, 
@@ -842,9 +912,8 @@ app.post('/api/deliveries/:id/postpone', async (req, res) => {
     // Bugungi yozuvni 'TAYYORMAS' ga o'tkazish
     await db.prepare(`
       UPDATE deliveries 
-      SET status = 'TAYYORMAS', postponed_reason = ?, postponed_date = ?
-      WHERE id = ?
-    `).run(reason || 'Mahsulot tayyor emas / Magazin yopiq', tomorrow, id);
+      SET status = 'TAYYORMAS', postponed_reason = ?, postponed_date = ?, date = ? WHERE id = ?
+    `).run(reason || 'Mahsulot tayyor emas / Magazin yopiq', tomorrow, getTodayDate(), id);
 
     // Ertangi kun uchun yangi reysga avtomat qo'shish (agar ertaga allaqachon mavjud bo'lmasa)
     const existsTomorrow = await db.prepare('SELECT id FROM deliveries WHERE store_id = ? AND date = ?').get(current.store_id, tomorrow);
