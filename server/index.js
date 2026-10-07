@@ -248,8 +248,6 @@ app.get('/api/deliveries', async (req, res) => {
       res.json(rows);
     } catch (err) {
       res.status(500).json({ error: err.message });
-    }
-  });
   }
 });
 
@@ -795,8 +793,6 @@ app.get('/api/deliveries', async (req, res) => {
       res.json(rows);
     } catch (err) {
       res.status(500).json({ error: err.message });
-    }
-  });
   }
 });
 
