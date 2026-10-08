@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Calendar, Filter, CheckCircle, Search, AlertCircle, RefreshCw, Layers } from 'lucide-react';
+import { Calendar, Filter, CheckCircle, Search, AlertCircle, RefreshCw, Layers, Download } from 'lucide-react';
 
 export default function ReconciliationView() {
   const [deliveries, setDeliveries] = useState([]);
@@ -49,6 +49,44 @@ export default function ReconciliationView() {
     setEndDate(lastDay.toISOString().split('T')[0]);
   }, []);
 
+  const exportToExcel = () => {
+    const headers = ['Sana', 'Tarmoq', 'Do\'kon', 'Karton (kg)', 'Karton Narxi', 'Salafan (kg)', 'Salafan Narxi', 'Jami Summa'];
+    const rows = filtered.map(d => [
+      d.date,
+      d.network_name || '',
+      d.store_name || '',
+      d.karton_kg || 0,
+      d.karton_price || 0,
+      d.salafan_kg || 0,
+      d.salafan_price || 0,
+      d.total_price || 0
+    ]);
+
+    let tableHtml = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><meta charset="utf-8"><head><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sverka</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml></head><body><table border="1">';
+    
+    tableHtml += '<tr>';
+    headers.forEach(h => { tableHtml += `<th style="background-color: #f3f4f6; font-weight: bold;">${h}</th>`; });
+    tableHtml += '</tr>';
+
+    rows.forEach(row => {
+      tableHtml += '<tr>';
+      row.forEach(cell => { tableHtml += `<td>${cell}</td>`; });
+      tableHtml += '</tr>';
+    });
+    
+    tableHtml += `<tr><td colspan="3" style="text-align:right; font-weight:bold;">Jami:</td><td style="font-weight:bold;">${totalKarton}</td><td></td><td style="font-weight:bold;">${totalSalafan}</td><td></td><td style="font-weight:bold;">${totalSum}</td></tr>`;
+
+    tableHtml += '</table></body></html>';
+
+    const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Sverka_${startDate}_dan_${endDate}_gacha.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleCloseMonth = async () => {
     if (!window.confirm("Haqiqatan ham oyni yopmoqchimisiz? Barcha hisobotlar joriy sanadan boshlab noldan hisoblanadi.")) {
       return;
@@ -96,13 +134,22 @@ export default function ReconciliationView() {
           <Layers className="w-7 h-7 text-indigo-600" />
           <span>Sverka va Oyni Yopish</span>
         </h2>
-        <button 
-          onClick={handleCloseMonth}
-          className="flex items-center space-x-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-md transition"
-        >
-          <AlertCircle className="w-5 h-5" />
-          <span>Joriy Oyni Yopish (Nollash)</span>
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button 
+            onClick={exportToExcel}
+            className="flex items-center space-x-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition"
+          >
+            <Download className="w-5 h-5" />
+            <span>Excel'ga Yuklash</span>
+          </button>
+          <button 
+            onClick={handleCloseMonth}
+            className="flex items-center space-x-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-md transition"
+          >
+            <AlertCircle className="w-5 h-5" />
+            <span>Joriy Oyni Yopish (Nollash)</span>
+          </button>
+        </div>
       </div>
 
       {closures.length > 0 && (
