@@ -1433,7 +1433,7 @@ app.get('/api/reconciliation', async (req, res) => {
         s.name as store_name, s.network_name
       FROM deliveries d
       JOIN stores s ON d.store_id = s.id
-      WHERE d.status = 'BAJARILDI' AND (d.is_active = 1 OR d.is_active IS NULL)
+      WHERE (d.is_active = 1 OR d.is_active IS NULL)
       ORDER BY d.date DESC
     `).all();
     res.json(rows);

@@ -50,11 +50,12 @@ export default function ReconciliationView() {
   }, []);
 
   const exportToExcel = () => {
-    const headers = ['Sana', 'Tarmoq', 'Do\'kon', 'Karton (kg)', 'Karton Narxi', 'Salafan (kg)', 'Salafan Narxi', 'Jami Summa'];
+    const headers = ['Sana', 'Tarmoq', 'Do\'kon', 'Holati', 'Karton (kg)', 'Karton Narxi', 'Salafan (kg)', 'Salafan Narxi', 'Jami Summa'];
     const rows = filtered.map(d => [
       d.date,
       d.network_name || '',
       d.store_name || '',
+      d.status === 'BAJARILDI' ? 'Bajarildi' : (d.status === 'TAYYORMAS' ? 'Otkaz qilingan' : 'Kutilmoqda'),
       d.karton_kg || 0,
       d.karton_price || 0,
       d.salafan_kg || 0,
@@ -74,7 +75,7 @@ export default function ReconciliationView() {
       tableHtml += '</tr>';
     });
     
-    tableHtml += `<tr><td colspan="3" style="text-align:right; font-weight:bold;">Jami:</td><td style="font-weight:bold;">${totalKarton}</td><td></td><td style="font-weight:bold;">${totalSalafan}</td><td></td><td style="font-weight:bold;">${totalSum}</td></tr>`;
+    tableHtml += `<tr><td colspan="4" style="text-align:right; font-weight:bold;">Jami:</td><td style="font-weight:bold;">${totalKarton}</td><td></td><td style="font-weight:bold;">${totalSalafan}</td><td></td><td style="font-weight:bold;">${totalSum}</td></tr>`;
 
     tableHtml += '</table></body></html>';
 
@@ -268,6 +269,11 @@ export default function ReconciliationView() {
                         <td className="py-2.5 px-4 font-bold text-slate-800">
                           {d.store_name}
                           {d.network_name && <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] rounded uppercase">{d.network_name}</span>}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          {d.status === 'BAJARILDI' && <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded-lg font-bold">Bajarildi</span>}
+                          {d.status === 'TAYYORMAS' && <span className="px-2 py-1 bg-rose-100 text-rose-700 text-xs rounded-lg font-bold">Otkaz</span>}
+                          {d.status === 'KUTILMOQDA' && <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-lg font-bold">Kutilmoqda</span>}
                         </td>
                         <td className="py-2.5 px-4">
                           {d.karton_kg > 0 ? (
