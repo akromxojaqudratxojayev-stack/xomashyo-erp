@@ -1429,7 +1429,7 @@ app.get('/api/reconciliation', async (req, res) => {
     const rows = await db.prepare(`
       SELECT 
         d.id, d.store_id, d.date, d.status,
-        d.karton_kg, d.salafan_kg, d.karton_price, d.salafan_price, d.total_price,
+        d.karton_kg, d.salafan_kg, d.karton_price_snapshot as karton_price, d.salafan_price_snapshot as salafan_price, d.total_amount as total_price,
         s.name as store_name, s.network_name
       FROM deliveries d
       JOIN stores s ON d.store_id = s.id
